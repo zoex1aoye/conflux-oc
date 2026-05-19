@@ -36,7 +36,7 @@ opencode SDK 提供 `client.session.prompt({ noReply: true })` 接口，可在**
 #### 1. 层栈可配置
 
 ```jsonc
-// plugin.jsonc — 层注册表
+// conflux-oc.jsonc — 层注册表
 {
   "layers": [
     {
@@ -67,6 +67,16 @@ opencode SDK 提供 `client.session.prompt({ noReply: true })` 接口，可在**
 }
 ```
 
+##### 配置搜索路径
+
+`conflux-oc.jsonc` 按以下顺序搜索（每个级别覆盖上一个）：
+
+1. **项目级**：`.opencode/conflux-oc.jsonc`
+2. **自定义**：`$OPENCODE_CONFIG_DIR/conflux-oc.jsonc`
+3. **全局**：`~/.config/opencode/conflux-oc.jsonc`
+
+如果以上都找不到，使用内置默认值（始终可用）。
+
 后期加 "team" 层只需插入一项，合并/注入逻辑自动适配。
 
 #### 2. 模型行为规则可配置
@@ -79,20 +89,20 @@ system prompt 注入不可用，因此行为规则通过注入消息的内容来
     {
       "id": "precheck-runtime",
       "trigger": "before:build_run_test",
-      "rule": "先读 Project 层的 Runtime Requirements，再查 Machine 层对应 domain 的可用路径，自动 prepend 版本切换命令",
+      "rule": "Before build/run/test: read Project Runtime Requirements first, then check Machine toolchain paths, auto-prepend version switching commands",
       "enabled": true
     },
     {
       "id": "knowledge-routing-cross-branch",
       "trigger": "on:note_discovery",
-      "rule": "核心架构/接口约定/设计决策 → _shared/；当前分支进度/实现细节 → SKILL.md",
+      "rule": "Core architecture/interface contracts/design decisions → _shared/; current branch progress/implementation details → SKILL.md",
       "condition": "is_git_project",
       "enabled": true
     },
     {
       "id": "knowledge-source-routing",
       "trigger": "on:note_discovery",
-      "rule": "只有工具输出结果写入 Machine/Platform，用户假设不进任何层",
+      "rule": "Only tool output results go to Machine/Platform layers; user assumptions never enter any layer",
       "enabled": true
     }
   ]
@@ -250,45 +260,50 @@ SKILL.md 中设 `Migration Map` 区块，标记旧模块中哪些功能已有新
 
 ### 范围
 
-聚焦 dev toolchain 清单，不做通用系统调优记录：
+聚焦 dev toolchain 清单（PATH 上的活跃版本），不做多版本自动扫描：
 
 ```json
 {
   "machine_id": "GLO-NX6",
+  "id_method": "dmi",
   "hostname": "zoex1aoye-laptop",
   "last_updated": "2026-05-19",
   "domains": {
     "java_dev": {
-      "jdk8": "/usr/lib/jvm/java-8-temurin",
-      "jdk11": "/usr/lib/jvm/java-11-temurin",
-      "maven": "/usr/share/maven"
+      "paths": { "java": "/usr/bin/java", "javac": "/usr/bin/javac", "mvn": "/usr/share/maven/bin/mvn" },
+      "versions": { "java": "11.0.22", "javac": "11.0.22", "mvn": "3.9.6" }
     },
     "go_dev": {
-      "version": "1.22.2",
-      "gopath": "/home/zoex1aoye/go"
+      "paths": { "go": "/usr/local/go/bin/go", "gofmt": "/usr/local/go/bin/gofmt" },
+      "versions": { "go": "1.22.2" }
     },
     "node_dev": {
-      "versions": ["18", "20", "22"],
-      "nvm_dir": "/home/zoex1aoye/.nvm"
+      "paths": { "node": "/usr/local/bin/node", "npm": "/usr/local/bin/npm" },
+      "versions": { "node": "20.11.0" }
     }
   }
 }
 ```
 
+> 不扫描多 JDK 版本、NVM 节点目录或 Go 环境变量。版本切换应通过在 `runtime-requirements.yaml` 中配置 `switching` 命令实现，详见 `tool.execute.before`。
+
 ### Machine 身份识别
 
 ```
-Primary key: DMI product_name（硬件决定的唯一标识）
+Primary key: 硬件唯一标识（跨平台 fallback 链）
 
-检测顺序（fallback 链）：
-  1. cat /sys/devices/virtual/dmi/id/product_name
-  2. cat /etc/machine-id（Linux 原生唯一 ID）
-  3. hostname + MAC 地址列表 hash（最后 fallback）
+检测顺序：
+  1. DMI：/sys/devices/virtual/dmi/id/product_name（Linux）
+     + /sys/devices/virtual/dmi/id/product_serial（补充备选）
+  2. /etc/machine-id（Linux 原生唯一 ID，取前 8 位）
+  3. Windows UUID（Get-CimInstance Win32_ComputerSystemProduct UUID）
+  4. hostname + 首张网卡 MAC 前 6 位（最后 fallback）
 
-注意：更换硬件或虚拟硬件环境后，DMI 变化 → 自动重新生成 machine profile
+注意：更换硬件或虚拟硬件环境后，DMI/serial 变化 → 自动重新生成 machine profile。
+Windows 用户走 UUID，不经过 DMI（Windows 不存在 sysfs）。
 ```
 
-路径：`~/.config/opencode/plugins/learning-plugin/machines/{sanitized_id}.json`
+路径：`~/.config/opencode/plugins/conflux-oc/machines/{sanitized_id}.json`
 
 ---
 
@@ -297,9 +312,9 @@ Primary key: DMI product_name（硬件决定的唯一标识）
 插件自动检测，内容包含在 noReply 注入消息中：
 
 ```
-用户操作系统: Linux (Ubuntu 25.04)
-Shell: bash (/usr/bin/bash)
-架构: x86_64
+OS: macOS (Sequoia 15.5)
+Shell: zsh (/bin/zsh)
+Arch: arm64
 ```
 
 **注意**：用户可能询问其他操作系统的场景（如"Windows 下 PowerShell 怎么写"）。模型基于对话上下文判断目标环境，假设场景中的其他 OS 信息不应污染本机 Platform。
@@ -315,8 +330,8 @@ Shell: bash (/usr/bin/bash)
   "user": "zoex",
   "last_updated": "2026-05-19",
   "output_preferences": {
-    "comment_style": "中文注释，每行配置说明作用",
-    "language": "技术解释用中文，命令输出保留原文",
+    "comment_style": "follow existing code comment style",
+    "language": "Technical explanations in English, keep command output as-is",
     "verbosity": "concise"
   },
   "security_boundaries": {
@@ -324,6 +339,64 @@ Shell: bash (/usr/bin/bash)
   }
 }
 ```
+
+### 语言自动检测
+
+User 层的 `language` 字段默认通过 `Intl.DateTimeFormat().resolvedOptions().locale` 自动检测系统语言决定。支持的 locale：
+
+| 系统语言 | 注入指令 |
+|---------|---------|
+| 中文 (zh) | `技术解释用中文，命令输出保留原文` |
+| 日文 (ja) | `技術説明は日本語、コマンド出力は原文のまま` |
+| 韩文 (ko) | `기술 설명은 한국어, 명령어 출력은 원문 유지` |
+| 其他 (默认英文) | `Technical explanations in English, keep command output as-is` |
+
+用户可创建 `~/.config/opencode/plugins/conflux-oc/users/{name}.json` 覆盖默认值。
+
+---
+
+## i18n（国际化）
+
+插件内所有用户可见的字符串（用户偏好默认值、决策日志模板）通过轻量 i18n 系统管理。
+
+### 架构
+
+```
+src/i18n/
+├── index.ts     # t(key, params?) 函数 + 语言检测
+├── en.ts        # 英语 locale（默认/fallback）
+└── zh.ts        # 中文 locale
+```
+
+### 语言选择
+
+```ts
+const locale = Intl.DateTimeFormat().resolvedOptions().locale
+// "zh-CN" → zh → 使用 zh.ts
+// "ja-JP" → ja → 不在字典 → fallback en.ts
+// 其他     → en.ts（默认）
+```
+
+### `t()` 函数
+
+```ts
+t("decision.title", { date: "2026-05-19" })
+// zh 环境下 → "# 决策日志 — 2026-05-19"
+// en 环境下 → "# Decision Log — 2026-05-19"
+```
+
+### 覆盖范围
+
+| 领域 | 使用 t() | 直接英文 |
+|------|---------|---------|
+| 用户偏好默认值（comment_style, sudo） | ✅ | |
+| 决策日志模板（decision.*） | ✅ | |
+| 迁移映射条目（migration.entry） | ✅ | |
+| Session 注入上下文（模型可见） | | ✅ |
+| 工具描述 + 返回值（模型可见） | | ✅ |
+| 行为规则（模型可见） | | ✅ |
+
+> 模型可见的字符串（session 注入、工具描述、行为规则）统一使用英文。LLM 训练语料以英文为主，英文输入能让模型理解最准确。
 
 ---
 
@@ -406,24 +479,40 @@ session.created hook
   ↓ 比对版本 → 决定注入内容
   ↓
 client.session.prompt({ noReply: true, parts: [compiledContext] })
-  ↓ 注入内容包含：
-     [1] 当前 session 上下文
-         - 用户操作系统: Linux (Ubuntu 25.04)
-         - Shell: bash (/usr/bin/bash)
-         - 架构: x86_64
-         - 你的机器: GLO-NX6 (zoex1aoye-laptop)
-         - 可用 toolchain: java_dev, go_dev, node_dev（调用 get_machine_context 获取详情）
-         - 你的偏好: 中文注释、concise
-         - 安全边界: sudo 命令列出给用户手动执行
-         - 当前项目 Runtime Requirements: JDK 11, Maven
-         - 当前分支: feature/new-auth
+   ↓ 注入内容包含：
+     ## Session Context
+         - OS: macOS (Sequoia 15.5)
+         - Shell: zsh (/bin/zsh)
+         - Arch: arm64
+         - Your machine: GLO-NX6 (zoex1aoye-laptop)
+         - Available toolchains: java_dev, go_dev, node_dev（Call get_machine_context(domain) for details）
+         - To switch tool versions, add a `switching` command in runtime-requirements.yaml
 
-     [2] 知识路由规则（见行为规则）
-         - 核心设计决策 → _shared/
-         - 分支进度 → SKILL.md
-         - 只有工具输出写入 Machine/Platform
+     ## User Preferences
+         - Comment style: follow existing code comment style
+         - Language: Technical explanations in English, keep command output as-is
+         - Verbosity: concise
+         - Security boundary: list commands for user to run manually
 
-     [3] 版本不一致提示（如有）
+     ## Project Info
+         - Current project: my-project
+         - Languages: java, typescript
+         - Runtime versions: java=11
+         - Build command: mvn clean compile
+         - Test command: mvn test
+         - Current branch: feature/new-auth
+
+     ## Knowledge Routing Rules
+         - Before build/run/test: read Project Runtime Requirements first...
+         - Core architecture/interface contracts → _shared/
+         - Branch progress/implementation details → SKILL.md
+         - Only tool outputs → Machine/Platform layers
+
+     ## Version Mismatch Detected（如有）
+         - Project java version is 17, but recorded Runtime Requirements require 11.
+
+     ## Available Migrations（如有）
+         - `lark/message.go` is replaced by `feishusdk.SendMessage()`
   ↓
 用户发出第一条消息 → 模型已拥有全部上下文
   ↓
@@ -458,16 +547,15 @@ file.edited hook → 检测 SKILL.md 变更 → 自动维护 decisions/ + _archi
 ```ts
 "session.created": async (input, output) => {
   const sessionId = input.sessionId
-  const pomVersion = await readPomJavaVersion()
-  const recordedVersion = await readRuntimeRequirements()
+  const runtime = await detectProjectRuntime()
+  const recorded = await readRuntimeRequirements()
   const platform = await detectPlatform()
   const machine = await loadMachineProfile()
   const userPrefs = await loadUserPreferences()
   const branch = await getCurrentBranch()
-  let ctx = buildContextMessage(platform, machine, userPrefs, branch)
-  if (pomVersion && recordedVersion && pomVersion !== recordedVersion) {
-    ctx += `\n注意：pom.xml 中 java.version=${pomVersion}，但记录的是 JDK ${recordedVersion}。`
-  }
+  const migrationEntries = await parseAllMigrationMaps()
+  const versionWarnings = diffRuntimeVersions(runtime, recorded)
+  let ctx = buildContextMessage(platform, machine, userPrefs, branch, migrationEntries, versionWarnings)
   await client.session.prompt({
     path: { id: sessionId },
     body: { noReply: true, parts: [{ type: "text", text: ctx }] },
@@ -510,17 +598,33 @@ file.edited hook → 检测 SKILL.md 变更 → 自动维护 decisions/ + _archi
 2. **Machine 和 User** 默认在 `~/.config/opencode/plugins/`，不进任何 git 仓库
 3. **Project 层**在 `.opencode/skills/` 下，进 git，团队共享
 
+### 敏感内容过滤器
+
+`src/security/sanitizer.ts` 在两个入口点实施强制过滤：
+
+**文件路径拦截**（`tool.execute.before`）：
+- 匹配 `.env`、`.ssh/`、`.gnupg/`、`*secret*`、`*token*`、`*credential*`、`*password*`、`*.pem`、`*.key` 的文件路径
+- `read` 工具执行前抛出 Error 阻止读取
+
+**内容匹配拦截**（`note_discovery` 写入前）：
+- SSH 私钥头：`-----BEGIN ... PRIVATE KEY-----`
+- 环境变量导出：`export TOKEN=xxx`、`export SECRET=xxx`、`export KEY=xxx`
+- Base64 长密文：20+ 字符以 `=` 结尾
+- 匹配到任意模式 → 放弃写入，返回 "Content contains sensitive data"
+
+**脱敏函数**：`redactSensitive()` 将匹配的敏感内容替换为 `[REDACTED]`，保留非敏感结构。
+
 ---
 
 ## 文件结构
 
 ```
-~/.config/opencode/plugins/learning-plugin/
-├── plugin.jsonc                    ← 层注册表 + behavior_rules + 存储适配器配置
+~/.config/opencode/plugins/conflux-oc/
+├── conflux-oc.jsonc                 ← 层注册表 + behavior_rules（可选覆盖）
 ├── machines/
 │   └── GLO-NX6.json                ← 当前机器 machine profile（自动维护）
 └── users/
-    └── zoex.json                   ← user profile（静态配置）
+    └── zoex.json                   ← user profile（可选配置）
 
 项目目录/.opencode/skills/
 ├── SKILL.md                        ← 分支级上下文
@@ -536,6 +640,8 @@ file.edited hook → 检测 SKILL.md 变更 → 自动维护 decisions/ + _archi
 │   └── SKILL.md
 └── ...
 ```
+
+> 配置搜索顺序：`.opencode/conflux-oc.jsonc` → `$OPENCODE_CONFIG_DIR/conflux-oc.jsonc` → `~/.config/opencode/conflux-oc.jsonc` → 内置默认
 
 ---
 
@@ -579,7 +685,7 @@ file.edited hook → 检测 SKILL.md 变更 → 自动维护 decisions/ + _archi
 | # | 任务 | 产出 |
 |---|------|------|
 | 1 | 创建项目结构（package.json, tsconfig.json, 目录） | 骨架 |
-| 2 | 实现 `plugin.jsonc` 层注册表 + 配置加载 | 可配置化 |
+| 2 | 实现 `conflux-oc.jsonc` 层注册表 + 配置加载 | 可配置化 |
 | 3 | 实现静默校验（读 pom.xml / which java / Machine profile） | 数据收集 |
 | 4 | 实现 `client.session.prompt({ noReply: true })` 注入 | **核心：上下文自消息 1 可见** |
 | 5 | 实现 `tool.execute.before` 版本切换自动 prepend | 核心体验 |
@@ -601,6 +707,7 @@ file.edited hook → 检测 SKILL.md 变更 → 自动维护 decisions/ + _archi
 | 11 | 隐私边界校验（工具输出敏感参数过滤） | 安全 |
 | 12 | 与 Tune Context Plugin 同时加载测试 | 兼容性验证 |
 | 13 | npm 包分发 + 首次安装体验 | 可发布 |
+| 14 | 接入 ctx.logger 系统日志（关键点位 + 调试级别） | 可观测性 |
 
 ---
 

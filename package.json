@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@x1aoye/conflux-oc",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Auto-learning plugin for opencode — cross-session project/machine/user context memory",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsup && tsc --emitDeclarationOnly",
+    "prepublishOnly": "npm run build",
+    "dev": "opencode plugin dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "plugin",
+    "learning",
+    "context",
+    "memory",
+    "knowledge"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zoex1aoye/conflux-oc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zoex1aoye/conflux-oc/issues"
+  },
+  "homepage": "https://github.com/zoex1aoye/conflux-oc#readme",
+  "author": "zoex",
+  "license": "MIT",
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.4.3"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.4.3",
+    "jsonc-parser": "^3.3.1",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.4.3",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ]
+}
