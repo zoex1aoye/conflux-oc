@@ -1,5 +1,6 @@
 import type { ResolvedPluginConfig } from "../config.js"
 import type { LayerRegistry } from "../layers/registry.js"
+import type { Logger } from "../utils/logger.js"
 import { getRecordedRequirements } from "../layers/project-layer.js"
 import { loadMachineProfile } from "../layers/machine-layer.js"
 import { detectToolchain, type ToolchainResult } from "../detection/toolchain.js"
@@ -69,12 +70,15 @@ function getRuntimeSwitchingCmd(
 }
 
 export function createToolExecuteBeforeHandler(
+  logger: Logger,
+  _client: any,
   config: ResolvedPluginConfig,
   _registry: LayerRegistry,
 ) {
   return async (input: any, output: any) => {
     if (input.tool === "read" && output.args?.filePath) {
       if (shouldBlockRead(output.args.filePath)) {
+        logger.warn("Sensitive file read blocked", { filePath: output.args.filePath })
         throw new Error("Cannot read sensitive files (.env, .ssh/, .gnupg/)")
       }
     }
@@ -92,6 +96,7 @@ export function createToolExecuteBeforeHandler(
     let switchingCmd = getRuntimeSwitchingCmd(recorded, lang)
     if (switchingCmd) {
       output.args.command = `${switchingCmd} && ${output.args.command}`
+      logger.debug("Version switching applied (from runtime-requirements.yaml)", { lang, command: switchingCmd })
       return
     }
 
@@ -108,6 +113,7 @@ export function createToolExecuteBeforeHandler(
           if (binaryPath && lang === "java") {
             const javaHome = binaryPath.replace(/\/bin\/java$/, "")
             output.args.command = `export JAVA_HOME="${javaHome}" && export PATH="$JAVA_HOME/bin:$PATH" && ${output.args.command}`
+            logger.debug("Version switching applied (from machine profile)", { lang, javaHome })
             return
           }
         }
@@ -126,6 +132,7 @@ export function createToolExecuteBeforeHandler(
 
     if (switchingCmd) {
       output.args.command = `${switchingCmd}${output.args.command}`
+      logger.debug("Version switching applied (live detection fallback)", { lang })
     }
   }
 }

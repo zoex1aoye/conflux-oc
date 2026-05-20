@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin"
 import type { ResolvedPluginConfig } from "../config.js"
+import type { Logger } from "../utils/logger.js"
 import { writeParsed, readParsed } from "../utils/parsers.js"
 import { determineScope, resolvePath } from "../utils/knowledge-router.js"
 import { saveMachineProfile, loadMachineProfile } from "../layers/machine-layer.js"
@@ -8,7 +9,7 @@ import { mkdirSync, writeFileSync, existsSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { containsSensitiveContent } from "../security/sanitizer.js"
 
-export function createNoteDiscoveryTool(config: ResolvedPluginConfig) {
+export function createNoteDiscoveryTool(logger: Logger, config: ResolvedPluginConfig) {
   return tool({
     description:
       "Record discovered knowledge. Core architecture/design decisions → _shared/ (cross-branch). Branch progress → SKILL.md. Only tool outputs go to Machine/Platform layers; user assumptions never enter any layer.",
@@ -33,6 +34,7 @@ export function createNoteDiscoveryTool(config: ResolvedPluginConfig) {
 
       const sensitive = containsSensitiveContent(note.content)
       if (sensitive.length > 0) {
+        logger.warn("Sensitive content blocked from recording", { domain: note.domain, patterns: sensitive })
         return "Content contains sensitive data (private keys, tokens, secrets) and will not be recorded"
       }
 
@@ -44,29 +46,45 @@ export function createNoteDiscoveryTool(config: ResolvedPluginConfig) {
           return `Project layer storage not configured; cannot record "${note.domain}"`
         }
 
-        let targetPath: string
+        mkdirSync(storage.basePath, { recursive: true })
+
         if (scope === "cross") {
-          targetPath = join(storage.basePath, "_shared", `${note.domain}.md`)
-        } else {
-          targetPath = join(storage.basePath, `${note.domain}.md`)
+          const targetPath = join(storage.basePath, "_shared", `${note.domain}.md`)
+          mkdirSync(dirname(targetPath), { recursive: true })
+          const existing = existsSync(targetPath)
+            ? readParsed(storage.basePath, targetPath)?.raw || ""
+            : ""
+          const entry = existing
+            ? `${existing}\n\n---\n\n## Cross-branch Knowledge\n\n${note.content}`
+            : `# ${note.domain}\n\n## Cross-branch Knowledge\n\n${note.content}`
+          writeFileSync(targetPath, entry, "utf-8")
+          return `Knowledge "${note.domain}" written to _shared/${note.domain}.md (cross-branch)`
         }
 
-        mkdirSync(dirname(targetPath), { recursive: true })
+        const isModule = note.domain.includes("/")
+        const skillDir = isModule
+          ? join(storage.basePath, note.domain)
+          : storage.basePath
+        const targetPath = join(skillDir, "SKILL.md")
+        mkdirSync(skillDir, { recursive: true })
 
         const existing = existsSync(targetPath)
           ? readParsed(storage.basePath, targetPath)?.raw || ""
           : ""
 
-        const marker =
-          scope === "cross" ? "## Cross-branch Knowledge\n\n" : "## Branch Knowledge\n\n"
-        const entry = existing
-          ? `${existing}\n\n---\n\n${marker}${note.content}`
-          : `# ${note.domain}\n\n${marker}${note.content}`
+        const sectionName = note.domain.split("/").pop() || note.domain
+        const section = `## ${sectionName}\n\n${note.content}\n`
 
-        writeFileSync(targetPath, entry, "utf-8")
-        return scope === "cross"
-          ? `Knowledge "${note.domain}" written to _shared/${note.domain}.md (cross-branch)`
-          : `Knowledge "${note.domain}" written to SKILL.md (${note.domain}.md) (branch)`
+        if (!existing) {
+          const name = note.domain.replace("/", "-")
+          const desc = note.content.split("\n")[0].slice(0, 100)
+          writeFileSync(targetPath, `---\nname: ${name}\ndescription: ${desc}\n---\n\n${section}`, "utf-8")
+        } else {
+          writeFileSync(targetPath, `${existing}\n\n---\n\n${section}`, "utf-8")
+        }
+
+        const label = isModule ? `${note.domain}/SKILL.md` : "SKILL.md"
+        return `Knowledge "${note.domain}" written to ${label} (branch)`
       }
 
       if (note.layer === "machine") {

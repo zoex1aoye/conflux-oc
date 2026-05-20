@@ -68,9 +68,10 @@ const DETECTORS: Record<
     parse: (content: string) => {
       const pkg = JSON.parse(content)
       const scripts = pkg.scripts || {}
+      const nodeVer = pkg.engines?.node || "unknown"
       return {
         languages: ["javascript", "typescript"],
-        versions: { node: "unknown" },
+        versions: { node: nodeVer },
         build: scripts.build || "npm run build",
         test: scripts.test || "npm test",
       }

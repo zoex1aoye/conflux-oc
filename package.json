@@ -6,12 +6,13 @@
   "description": "Auto-learning plugin for opencode — cross-session project/machine/user context memory",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    },
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsup && tsc --emitDeclarationOnly",
@@ -36,6 +37,9 @@
     "url": "https://github.com/zoex1aoye/conflux-oc/issues"
   },
   "homepage": "https://github.com/zoex1aoye/conflux-oc#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "author": "zoex",
   "license": "MIT",
   "peerDependencies": {

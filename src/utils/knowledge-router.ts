@@ -59,7 +59,8 @@ export function resolvePath(
 
   if (note.layer === "project") {
     if (scope === "cross") return join(storage.basePath, "_shared", `${note.domain}.md`)
-    return join(storage.basePath, `${note.domain}.md`)
+    if (note.domain.includes("/")) return join(storage.basePath, note.domain, "SKILL.md")
+    return join(storage.basePath, "SKILL.md")
   }
 
   return join(storage.basePath, storage.template)

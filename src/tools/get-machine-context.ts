@@ -1,9 +1,10 @@
 import { tool } from "@opencode-ai/plugin"
 import type { ResolvedPluginConfig } from "../config.js"
+import type { Logger } from "../utils/logger.js"
 import { loadMachineProfile } from "../layers/machine-layer.js"
 import { detectToolchain } from "../detection/toolchain.js"
 
-export function createGetMachineContextTool(config: ResolvedPluginConfig) {
+export function createGetMachineContextTool(logger: Logger, config: ResolvedPluginConfig) {
   return tool({
     description:
       "Get full details of a dev toolchain domain, including executable paths and versions",
@@ -17,6 +18,7 @@ export function createGetMachineContextTool(config: ResolvedPluginConfig) {
 
       const machine = loadMachineProfile(config)
       if (machine?.domains?.[domain]) {
+        logger.debug("Machine context served from profile", { domain })
         const d = machine.domains[domain]
         const paths = d.paths
           ? Object.entries(d.paths)
@@ -42,6 +44,7 @@ export function createGetMachineContextTool(config: ResolvedPluginConfig) {
 
       const toolchain = await detectToolchain()
       const result = toolchain[domain?.replace("_dev", "") as keyof typeof toolchain]
+      logger.debug("Machine context live detection fallback", { domain, found: !!result })
 
       if (!result) {
         return `No toolchain found for ${domain}; ensure the relevant dev tools are installed and on PATH`
