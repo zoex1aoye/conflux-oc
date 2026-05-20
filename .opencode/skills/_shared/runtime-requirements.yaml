@@ -1,0 +1,4 @@
+node:
+  version: ">=18.0.0"
+build: "npm run clean && tsup && tsc --emitDeclarationOnly"
+test: "npm test"

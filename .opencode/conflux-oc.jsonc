@@ -1,0 +1,70 @@
+{
+  // ─── Configuration Search Order ───
+  // 1. .opencode/conflux-oc.jsonc (project-level, this file)
+  // 2. $OPENCODE_CONFIG_DIR/conflux-oc.jsonc (custom)
+  // 3. ~/.config/opencode/conflux-oc.jsonc (global)
+  // If none found → built-in defaults (always available)
+  //
+  // Each level overrides the previous on a per-key basis.
+
+  "layers": [
+    {
+      "name": "platform",
+      "priority": 0,
+      "storage": "transform-only",
+      "inject": "always"
+      // Runtime detection only (OS/Shell/Arch), no persistence needed
+    },
+    {
+      "name": "machine",
+      "priority": 1,
+      "storage": {
+        "type": "local",
+        "path": "machines/{id}.json"
+        // {id} → machine_id from DMI → /etc/machine-id → hostname+MAC fallback
+      },
+      "inject": "summary-only"
+    },
+    {
+      "name": "user",
+      "priority": 2,
+      "storage": {
+        "type": "local",
+        "path": "users/{name}.json"
+        // {name} → $USER or $USERNAME
+      },
+      "inject": "always"
+    },
+    {
+      "name": "project",
+      "priority": 3,
+      "storage": {
+        "type": "local",
+        "path": ".opencode/skills/"
+      },
+      "inject": "on-demand"
+    }
+  ],
+
+  "behavior_rules": [
+    {
+      "id": "precheck-runtime",
+      "trigger": "before:build_run_test",
+      "rule": "Before build/run/test: read Project Runtime Requirements first, then check Machine toolchain paths, auto-prepend version switching commands",
+      "enabled": true
+    },
+    {
+      "id": "knowledge-routing-cross-branch",
+      "trigger": "on:note_discovery",
+      "rule": "Core architecture/interface contracts/design decisions → _shared/; current branch progress/implementation details → SKILL.md",
+      "condition": "is_git_project",
+      "enabled": true
+    },
+    {
+      "id": "knowledge-source-routing",
+      "trigger": "on:note_discovery",
+      "rule": "Only tool output results go to Machine/Platform layers; user assumptions never enter any layer",
+      "enabled": true
+    }
+  ]
+}
