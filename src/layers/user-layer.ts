@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs"
+import { join, dirname } from "node:path"
 import type { ResolvedPluginConfig } from "../config.js"
 import { detectSystemLanguage, languageInstruction } from "../detection/language.js"
 import { t } from "../i18n/index.js"
@@ -15,6 +15,7 @@ export interface UserPreferences {
   security_boundaries: {
     sudo: string
   }
+  [key: string]: unknown
 }
 
 function defaultPreferences(): UserPreferences {
@@ -50,4 +51,13 @@ export function loadUserPreferences(config: ResolvedPluginConfig): UserPreferenc
   } catch {
     return defaults
   }
+}
+
+export function saveUserPreferences(config: ResolvedPluginConfig, prefs: Record<string, unknown>): void {
+  const path = userProfilePath(config)
+  if (!path) return
+  const existing = loadUserPreferences(config) as unknown as Record<string, unknown>
+  const merged = { ...existing, ...prefs, last_updated: new Date().toISOString().split("T")[0] }
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, JSON.stringify(merged, null, 2), "utf-8")
 }

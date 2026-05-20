@@ -11,6 +11,8 @@ export interface MachineDomain {
   versions_list?: string[]
   nvm_dir?: string
   gopath?: string
+  /** Discovered knowledge text recorded via note_discovery */
+  knowledge?: Record<string, string>
 }
 
 export interface MachineProfile {

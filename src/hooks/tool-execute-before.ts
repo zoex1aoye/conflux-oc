@@ -5,6 +5,11 @@ import { getRecordedRequirements } from "../layers/project-layer.js"
 import { loadMachineProfile } from "../layers/machine-layer.js"
 import { detectToolchain, type ToolchainResult } from "../detection/toolchain.js"
 import { shouldBlockRead } from "../security/sanitizer.js"
+import { checkFile } from "./large-file-guard.js"
+import { execSync, exec } from "node:child_process"
+import { promisify } from "node:util"
+import { platform } from "node:os"
+const asyncExec = promisify(exec)
 
 const BUILD_RUN_PATTERNS: Record<string, string[]> = {
   java: ["mvn ", "gradle ", "gradlew ", "java ", "javac "],
@@ -57,8 +62,25 @@ function buildGoSwitching(toolchain: ToolchainResult): string {
   return `export PATH="${go.paths.go.replace(/\/go$/, "")}:$PATH" && `
 }
 
-function buildNodeSwitching(toolchain: ToolchainResult): string {
-  return ""
+function buildNodeSwitching(toolchain: ToolchainResult, requiredVersion?: string): string {
+  const node = toolchain.node
+  if (!node?.paths?.node) return ""
+
+  const nvmDir = process.env.NVM_DIR
+  if (nvmDir && requiredVersion) {
+    const ver = requiredVersion.replace(/^[+>=<~^]/, "")
+    return `. "${nvmDir}/nvm.sh" && nvm use ${ver} && `
+  }
+
+  const fnmDetect = process.env.FNM_DIR
+  if (fnmDetect && requiredVersion) {
+    const ver = requiredVersion.replace(/^[+>=<~^]/, "")
+    return `fnm use ${ver} && `
+  }
+
+  const nodePath = node.paths.node
+  const nodeHome = nodePath.replace(/[/\\]bin[/\\]node$/, "")
+  return `export PATH="${nodeHome}/bin:$PATH" && `
 }
 
 function getRuntimeSwitchingCmd(
@@ -77,9 +99,20 @@ export function createToolExecuteBeforeHandler(
 ) {
   return async (input: any, output: any) => {
     if (input.tool === "read" && output.args?.filePath) {
-      if (shouldBlockRead(output.args.filePath)) {
-        logger.warn("Sensitive file read blocked", { filePath: output.args.filePath })
-        throw new Error("Cannot read sensitive files (.env, .ssh/, .gnupg/)")
+      if (shouldBlockRead(output.args.filePath, config.blockedFilePatterns)) {
+        logger.warn("Sensitive file read blocked", { filePath: output.args.filePath, patterns: config.blockedFilePatterns })
+        throw new Error(`Cannot read blocked files: ${config.blockedFilePatterns.join(", ")}`)
+      }
+      const guardRule = config.behavior_rules.find((r) => r.id === "large-file-guard")
+      if (guardRule?.enabled) {
+        const maxBytes = config.largeFileThreshold
+        await checkFile(output.args.filePath, maxBytes).catch((err) => {
+          logger.info("Large file read blocked", {
+            filePath: output.args.filePath,
+            reason: err.message,
+          })
+          throw err
+        })
       }
     }
 
@@ -127,6 +160,9 @@ export function createToolExecuteBeforeHandler(
         break
       case "go":
         switchingCmd = buildGoSwitching(toolchain)
+        break
+      case "node":
+        switchingCmd = buildNodeSwitching(toolchain, recorded?.["node"]?.version)
         break
     }
 

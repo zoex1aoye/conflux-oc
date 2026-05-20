@@ -42,7 +42,7 @@
         "type": "local",
         "path": ".opencode/skills/"
       },
-      "inject": "on-demand"
+      "inject": "summary-only"
     }
   ],
 
@@ -65,6 +65,19 @@
       "trigger": "on:note_discovery",
       "rule": "Only tool output results go to Machine/Platform layers; user assumptions never enter any layer",
       "enabled": true
+    },
+    {
+      "id": "large-file-guard",
+      "trigger": "before:file_read",
+      "rule": "Files > 1MB or binary: block direct read(), return file metadata, let model decide approach",
+      "enabled": true
     }
-  ]
+  ],
+  // 可选：自定义大文件阈值（字节），默认 1048576 (1MB)
+  // "largeFileThreshold": 5242880
+
+  // 文件路径拦截模式列表。这些模式匹配的文件会被 read() 工具直接拒绝。
+  // 默认值适合大多数项目。如果信任项目中的 .env 文件不被泄露，可移除此条目。
+  // 支持 * 通配符（类似 .gitignore 风格）。
+  // "blockedFilePatterns": [".env*", ".ssh/", ".gnupg/"]
 }

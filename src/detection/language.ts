@@ -10,6 +10,11 @@ const LANGUAGE_MAP: Record<string, string> = {
 const FALLBACK = "Technical explanations in English, keep command output as-is"
 
 export function detectSystemLanguage(): string {
+  const envLang = process.env.LANG || process.env.LC_ALL || process.env.LC_MESSAGES
+  if (envLang) {
+    const code = envLang.split(".")[0].split("_")[0].toLowerCase()
+    if (LANGUAGE_MAP[code]) return code
+  }
   try {
     const locale = Intl.DateTimeFormat().resolvedOptions().locale
     return locale.split("-")[0].toLowerCase()

@@ -14,11 +14,12 @@ const SENSITIVE_FILE_PATTERNS = [
 
 const SENSITIVE_CONTENT_PATTERNS = [
   /-----BEGIN\s+(RSA|DSA|EC|OPENSSH)?\s*PRIVATE\s+KEY-----/,
-  /export\s+\w*TOKEN\w*\s*=\s*\S+/i,
-  /export\s+\w*SECRET\w*\s*=\s*\S+/i,
-  /export\s+\w*KEY\w*\s*=\s*\S+/i,
-  /export\s+\w*PASSWORD\w*\s*=\s*\S+/i,
-  /[\w-]{20,}={2,}$/,
+  /(?:export|set)\s+\w*TOKEN\w*\s*=\s*\S+/i,
+  /(?:export|set)\s+\w*SECRET\w*\s*=\s*\S+/i,
+  /(?:export|set)\s+\w*KEY\w*\s*=\s*\S+/i,
+  /(?:export|set)\s+\w*PASSWORD\w*\s*=\s*\S+/i,
+  // Long base64-like tokens (≥40 chars, at least one digit, ending with == or =)
+  /[\w/-]{40,}=\s*$/m,
 ]
 
 export function isSensitiveFilePath(filePath: string): boolean {
@@ -43,11 +44,23 @@ export function redactSensitive(content: string): string {
   return redacted
 }
 
-export function shouldBlockRead(filePath: string): boolean {
-  if (filePath.includes(".env")) return true
-  const sshMatch = /\/\.ssh\//
-  if (sshMatch.test(filePath)) return true
-  const gnupgMatch = /\/\.gnupg\//
-  if (gnupgMatch.test(filePath)) return true
+function patternToRegex(pattern: string): RegExp {
+  let src = ""
+  for (const ch of pattern) {
+    if (ch === "*") {
+      src += ".*"
+    } else if (/[.+^${}()|[\]\\]/.test(ch)) {
+      src += `\\${ch}`
+    } else {
+      src += ch
+    }
+  }
+  return new RegExp(src, "i")
+}
+
+export function shouldBlockRead(filePath: string, patterns: string[] = [".env*", ".ssh/", ".gnupg/"]): boolean {
+  for (const p of patterns) {
+    if (patternToRegex(p).test(filePath)) return true
+  }
   return false
 }

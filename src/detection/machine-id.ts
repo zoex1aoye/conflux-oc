@@ -36,12 +36,17 @@ function tryHostnameMAC(): string {
   try {
     const isWin = platform() === "win32"
     const cmd = isWin
-      ? 'powershell -Command "Get-NetAdapter | Select-Object -ExpandProperty MacAddress"'
+      ? 'powershell -Command "Get-NetAdapter | Where-Object { $_.Status -eq \'Up\' -and $_.Virtual -eq $false } | Select-Object -ExpandProperty MacAddress"'
       : "ifconfig 2>/dev/null || ip link 2>/dev/null"
     const output = execSync(cmd, { encoding: "utf-8", timeout: 5000 })
     const macs = output.match(/([0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5})/g)
     if (macs && macs.length > 0) {
-      return `${hn}-${macs[0].replace(/[:-]/g, "").slice(0, 6)}`
+      const physical = macs.filter((m) => {
+        const firstByte = parseInt(m.split(/[:-]/)[0], 16)
+        return (firstByte & 0b00000010) === 0
+      })
+      const selected = physical.length > 0 ? physical[0] : macs[0]
+      return `${hn}-${selected.replace(/[:-]/g, "").slice(0, 6)}`
     }
     return hn
   } catch {

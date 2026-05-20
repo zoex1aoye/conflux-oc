@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { execSync } from "node:child_process"
 import { parse } from "jsonc-parser"
 
 export interface LayerConfig {
@@ -21,6 +22,7 @@ export interface BehaviorRule {
 export interface PluginConfig {
   layers: LayerConfig[]
   behavior_rules: BehaviorRule[]
+  blockedFilePatterns?: string[]
 }
 
 export interface ResolvedStorage {
@@ -35,6 +37,8 @@ export interface ResolvedPluginConfig {
   pluginDataDir: string
   projectRoot: string
   resolvedStorages: Record<string, ResolvedStorage>
+  largeFileThreshold?: number
+  blockedFilePatterns: string[]
 }
 
 const BUILTIN_DEFAULTS: PluginConfig = {
@@ -42,8 +46,9 @@ const BUILTIN_DEFAULTS: PluginConfig = {
     { name: "platform", priority: 0, storage: "transform-only", inject: "always" },
     { name: "machine", priority: 1, storage: { type: "local", path: "machines/{id}.json" }, inject: "summary-only" },
     { name: "user", priority: 2, storage: { type: "local", path: "users/{name}.json" }, inject: "always" },
-    { name: "project", priority: 3, storage: { type: "local", path: ".opencode/skills/" }, inject: "on-demand" },
+    { name: "project", priority: 3, storage: { type: "local", path: ".opencode/skills/" }, inject: "summary-only" },
   ],
+  blockedFilePatterns: [".env*", ".ssh/", ".gnupg/"],
   behavior_rules: [
     {
       id: "precheck-runtime",
@@ -62,6 +67,12 @@ const BUILTIN_DEFAULTS: PluginConfig = {
       id: "knowledge-source-routing",
       trigger: "on:note_discovery",
       rule: "Only tool output results go to Machine/Platform layers; user assumptions never enter any layer",
+      enabled: true,
+    },
+    {
+      id: "large-file-guard",
+      trigger: "before:file_read",
+      rule: "Files > 1MB or binary: block direct read(), return file metadata, let model decide approach",
       enabled: true,
     },
   ],
@@ -150,9 +161,39 @@ export function resolvePluginConfig(
     pluginDataDir,
     projectRoot: base,
     resolvedStorages,
+    largeFileThreshold: (config as any).largeFileThreshold ?? undefined,
+    blockedFilePatterns: (config as any).blockedFilePatterns ?? BUILTIN_DEFAULTS.blockedFilePatterns ?? [".env*", ".ssh/", ".gnupg/"],
   }
 }
 
 export function getEnabledRules(config: PluginConfig): BehaviorRule[] {
   return config.behavior_rules.filter((r) => r.enabled)
+}
+
+export interface RuleContext {
+  trigger: string
+  projectRoot?: string
+  domain?: string
+  layer?: string
+}
+
+function checkCondition(condition: string | undefined, ctx: RuleContext): boolean {
+  if (!condition) return true
+  if (condition === "is_git_project") {
+    try {
+      execSync("git rev-parse --is-inside-work-tree", { cwd: ctx.projectRoot, encoding: "utf-8", timeout: 2000 })
+      return true
+    } catch {
+      return false
+    }
+  }
+  return true
+}
+
+export function evaluateBehaviorRules(config: PluginConfig, ctx: RuleContext): BehaviorRule[] {
+  return config.behavior_rules.filter((r) => {
+    if (!r.enabled) return false
+    if (r.trigger !== ctx.trigger && !r.trigger.startsWith(`${ctx.trigger}:`)) return false
+    return checkCondition(r.condition, ctx)
+  })
 }

@@ -5,3 +5,4 @@ dist/
 .env
 sync-cache.sh
 AGENTS.md
+.opencode/
