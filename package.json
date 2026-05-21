@@ -1,18 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@x1aoye/conflux-oc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Auto-learning plugin for opencode — cross-session project/machine/user context memory",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js",
-        "default": "./dist/index.js"
-      }
-    },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsup && tsc --emitDeclarationOnly",
