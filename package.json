@@ -37,6 +37,10 @@
     "url": "https://github.com/zoex1aoye/conflux-oc/issues"
   },
   "homepage": "https://github.com/zoex1aoye/conflux-oc#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
