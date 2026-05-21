@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@x1aoye/conflux-oc",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "type": "module",
   "description": "Auto-learning plugin for opencode — cross-session project/machine/user context memory",
   "main": "./dist/index.js",
