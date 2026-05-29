@@ -1,31 +1,73 @@
-import type { Logger } from "../utils/logger.js"
-import type { ResolvedPluginConfig } from "../config.js"
-import { buildLargeFileSystemRule } from "./large-file-guard.js"
+const CONVENTION_MANAGEMENT = [
+  "## Convention & Habit Management",
+  "",
+  "You have tools to manage user preferences across sessions:",
+  "- `record_convention()` — capture when user states a new rule or habit",
+  "- `compact_preferences()` — merge and simplify accumulated conventions",
+  "",
+  "Actively look for opportunities to record conventions and habits —",
+  "don't wait for the user to explicitly state a rule.",
+  "Proactive recording is valued over passive waiting.",
+  "",
+  "Be mindful of your current mode: if you are in plan/analysis mode,",
+  "focus on recording explicit user statements rather than aggressively",
+  "inferring implicit patterns. If in build/coding mode, be more proactive.",
+  "",
+  "### Content Language",
+  "",
+  "All convention content must be stored in English, regardless of the user's input language.",
+  "When the user states a convention in another language (e.g. Chinese),",
+  "translate it to English before calling `record_convention`.",
+  "",
+  "### Coding Conventions (record_convention with type=\"convention\")",
+  "",
+  "Actively identify coding conventions from user input — not just explicit rules.",
+  "When the user states a coding rule, preference, or requirement",
+  "(e.g. \"functions should have doc comments\", \"use 2-space indentation\", \"no magic numbers\"),",
+  "**call `record_convention` immediately** — do NOT ask for confirmation.",
+  "The user stating it is consent enough.",
+  "",
+  "Also watch for implicit signals:",
+  "- Repeated emphasis on a particular code style across messages",
+  "- Preferences revealed through corrections or feedback",
+  "- Patterns in how they ask you to write code",
+  "",
+  "### Workflow Habits (record_convention with type=\"habit\")",
+  "",
+  "Actively identify and record workflow habits from user input.",
+  "When the user describes their workflow, preferences, or repeated behaviors",
+  "(e.g. \"I always run tests before committing\", \"write tests before implementation\", \"I prefer TDD\"),",
+  "**call `record_convention` with type=\"habit\" immediately** — do NOT ask for confirmation.",
+  "",
+  "Also watch for implicit signals:",
+  "- Repeated workflow patterns across messages",
+  "- Frustration with a current approach",
+  "- Personal preferences about how they work",
+  "",
+  "### Maintenance",
+  "",
+  "- Only consider compaction when conventions exceed roughly 20 entries",
+  "- At most one compaction per session",
+  "- Do NOT call both record_convention and compact_preferences in the same response",
+  "- After compaction, inform user in 1 sentence (at end of current task, not interrupting)",
+].join("\n")
 
-function buildSkillEditRule(): string {
-  return [
-    "## Skill Management",
-    "",
-    "After editing SKILL.md, evaluate if the change is substantial.",
-    "If so, call note_discovery() to record the knowledge.",
-    "Choose the appropriate layer (project/machine/user), scope (branch/cross),",
-    "and mode (upsert/append/deprecate) for the knowledge.",
-  ].join("\n")
-}
+const SESSION_TITLE_RULES = [
+  "## Session Title Management",
+  "",
+  "You have a tool `update_session_title` to set a concise session title:",
+  "- After understanding the user's core request, call it to set a descriptive title (max 60 chars)",
+  "- If the conversation's main topic clearly shifts, call it again to update the title",
+  "- Do NOT update for minor tangents, clarifications, or sub-tasks",
+  "- Write titles in the same language as the user's messages, matching their detected language",
+].join("\n")
 
-export function createSystemTransformHandler(
-  logger: Logger,
-  config: ResolvedPluginConfig,
-) {
-  const largeFileRule = buildLargeFileSystemRule(config.largeFileThreshold)
-  const skillEditRule = buildSkillEditRule()
-  const combined = `${largeFileRule}\n\n${skillEditRule}`
-  return async (_input: any, output: any) => {
-    if (!output.system) {
-      output.system = combined
-    } else if (typeof output.system === "string") {
-      output.system = `${output.system}\n\n${combined}`
-    }
-    logger.debug("System rules appended to system prompt")
+export function createSystemTransformHook() {
+  return async (
+    _input: { sessionID?: string; model: any },
+    output: { system: string[] },
+  ) => {
+    output.system.push(CONVENTION_MANAGEMENT)
+    output.system.push(SESSION_TITLE_RULES)
   }
 }

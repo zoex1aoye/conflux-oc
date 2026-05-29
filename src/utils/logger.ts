@@ -1,3 +1,5 @@
+import { PLUGIN_NAME } from "../constants.js"
+
 export interface Logger {
   info(message: string, extra?: Record<string, unknown>): void
   warn(message: string, extra?: Record<string, unknown>): void
@@ -10,7 +12,7 @@ export function createLogger(client: any): Logger {
     try {
       await client.app.log({
         body: {
-          service: "conflux-oc",
+          service: PLUGIN_NAME,
           level,
           message,
           extra: extra ?? {},

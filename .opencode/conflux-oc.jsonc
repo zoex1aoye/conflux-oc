@@ -1,83 +1,10 @@
 {
-  // ─── Configuration Search Order ───
-  // 1. .opencode/conflux-oc.jsonc (project-level, this file)
-  // 2. $OPENCODE_CONFIG_DIR/conflux-oc.jsonc (custom)
-  // 3. ~/.config/opencode/conflux-oc.jsonc (global)
-  // If none found → built-in defaults (always available)
+  // ─── conflux-oc plugin configuration ───
   //
-  // Each level overrides the previous on a per-key basis.
-
-  "layers": [
-    {
-      "name": "platform",
-      "priority": 0,
-      "storage": "transform-only",
-      "inject": "always"
-      // Runtime detection only (OS/Shell/Arch), no persistence needed
-    },
-    {
-      "name": "machine",
-      "priority": 1,
-      "storage": {
-        "type": "local",
-        "path": "machines/{id}.json"
-        // {id} → machine_id from DMI → /etc/machine-id → hostname+MAC fallback
-      },
-      "inject": "summary-only"
-    },
-    {
-      "name": "user",
-      "priority": 2,
-      "storage": {
-        "type": "local",
-        "path": "users/{name}.json"
-        // {name} → $USER or $USERNAME
-      },
-      "inject": "always"
-    },
-    {
-      "name": "project",
-      "priority": 3,
-      "storage": {
-        "type": "local",
-        "path": ".opencode/skills/"
-      },
-      "inject": "summary-only"
-    }
-  ],
-
-  "behavior_rules": [
-    {
-      "id": "precheck-runtime",
-      "trigger": "before:build_run_test",
-      "rule": "Before build/run/test: read Project Runtime Requirements first, then check Machine toolchain paths, auto-prepend version switching commands",
-      "enabled": true
-    },
-    {
-      "id": "knowledge-routing-cross-branch",
-      "trigger": "on:note_discovery",
-      "rule": "Core architecture/interface contracts/design decisions → _shared/; current branch progress/implementation details → SKILL.md",
-      "condition": "is_git_project",
-      "enabled": true
-    },
-    {
-      "id": "knowledge-source-routing",
-      "trigger": "on:note_discovery",
-      "rule": "Only tool output results go to Machine/Platform layers; user assumptions never enter any layer",
-      "enabled": true
-    },
-    {
-      "id": "large-file-guard",
-      "trigger": "before:file_read",
-      "rule": "Files > 1MB or binary: block direct read(), return file metadata, let model decide approach",
-      "enabled": true
-    }
-  ],
-  // 可选：自定义大文件阈值（字节），默认 1048576 (1MB)
-  // "largeFileThreshold": 5242880
-
-  // 文件路径拦截模式列表。这些模式匹配的文件会被 read() 工具直接拒绝。
-  // 默认值适合大多数项目。如果信任项目中的 .env 文件不被泄露，可移除此条目。
-  // 支持 * 通配符（类似 .gitignore 风格）。
-  // "blockedFilePatterns": [".env*", ".ssh/", ".gnupg/"]
+  // This file is optional. All settings have safe defaults.
+  // User data (habits, conventions) is stored in:
+  //   ~/.config/opencode/plugins/conflux-oc/users/<USER>.json
+  //
+  // No configuration keys are currently consumed by the plugin.
+  // This file serves as a placeholder for future options.
 }

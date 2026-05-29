@@ -10,5 +10,6 @@ export default defineConfig({
   splitting: false,
   sourcemap: false,
   minify: false,
-  external: ["@opencode-ai/plugin"],
+  external: [],
+  noExternal: ["jsonc-parser", "@opencode-ai/plugin"],
 })
