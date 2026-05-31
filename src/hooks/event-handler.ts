@@ -49,11 +49,24 @@ function buildContext(config: ResolvedPluginConfig): string {
   )
 
   if (userPrefs.workflow_habits) {
-    sections.push("", "## Your Workflow Habits", "", userPrefs.workflow_habits)
+    sections.push(
+      "",
+      "## Your Workflow Habits",
+      "",
+      "Apply these patterns. Update via record_convention if overridden:",
+      "",
+      userPrefs.workflow_habits,
+    )
   }
 
   if (userPrefs.coding_conventions && userPrefs.coding_conventions.length > 0) {
-    sections.push("", "## Known Coding Conventions", "")
+    sections.push(
+      "",
+      "## Known Coding Conventions",
+      "",
+      "Follow these in this session. Cite when relevant. Update if overridden:",
+      "",
+    )
     for (const c of userPrefs.coding_conventions) {
       sections.push(`- ${c}`)
     }

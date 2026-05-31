@@ -5,7 +5,7 @@ import { loadUserPreferences, saveUserPreferences } from "../layers/user-layer.j
 
 export function createRecordConventionTool(logger: Logger, config: ResolvedPluginConfig) {
   return tool({
-    description: "Record a workflow habit or coding convention observed from the user. Habits describe the user's preferred workflow (single string). Conventions are individual coding rules (appended to list, deduplicated by exact match).",
+    description: "Record a workflow habit or coding convention observed from the user. Habits are appended (with separator) to existing habits. Conventions are appended to a list (deduplicated by exact match).",
     args: {
       type: tool.schema.enum(["habit", "convention"]).describe("habit for workflow pattern, convention for coding rule"),
       content: tool.schema.string().describe("the observed habit or convention description"),
@@ -14,18 +14,26 @@ export function createRecordConventionTool(logger: Logger, config: ResolvedPlugi
       const prefs = loadUserPreferences(config)
 
       if (args.type === "habit") {
-        saveUserPreferences(config, { workflow_habits: args.content })
-        logger.info("Workflow habit recorded", { content: args.content })
-      } else {
-        const existing = prefs.coding_conventions ?? []
-        if (existing.includes(args.content)) {
-          return `Convention already recorded: "${args.content}"`
+        const trimmed = args.content.trim()
+        const existing = prefs.workflow_habits || ""
+        if (existing.includes(trimmed)) {
+          return `Habit already recorded (content already exists in stored habits)`
         }
-        saveUserPreferences(config, { coding_conventions: [...existing, args.content] })
-        logger.info("Coding convention recorded", { content: args.content })
+        const merged = existing
+          ? `${existing}\n---\n${trimmed}`
+          : trimmed
+        saveUserPreferences(config, { workflow_habits: merged })
+        logger.info("Workflow habit recorded", { content: trimmed })
+        return `Saved habit: "${trimmed}"`
       }
 
-      return `Saved ${args.type}: "${args.content}"`
+      const existing = prefs.coding_conventions ?? []
+      if (existing.includes(args.content)) {
+        return `Convention already recorded: "${args.content}"`
+      }
+      saveUserPreferences(config, { coding_conventions: [...existing, args.content] })
+      logger.info("Coding convention recorded", { content: args.content })
+      return `Saved convention: "${args.content}"`
     },
   })
 }
